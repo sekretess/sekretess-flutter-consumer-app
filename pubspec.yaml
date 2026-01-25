@@ -1,0 +1,92 @@
+name: consumer_flutter_app
+description: Sekretess Consumer Flutter Application
+publish_to: 'none'
+version: 1.0.35+35
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+
+  # Dependency Injection
+  get_it: ^7.6.4
+  injectable: ^2.3.2
+
+  # Networking
+  dio: ^5.4.0
+  web_socket_channel: ^2.4.0
+  connectivity_plus: ^5.0.2
+
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.1
+  shared_preferences: ^2.2.2
+
+  # Database
+  drift: ^2.14.1
+  sqlite3_flutter_libs: ^0.5.18
+
+  # JSON Serialization
+  json_annotation: ^4.8.1
+  freezed_annotation: ^2.4.1
+
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.10
+  firebase_analytics: ^10.7.4
+
+  # UI
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.2.1
+  crypto: ^3.0.3
+  equatable: ^2.0.5
+
+  # JWT
+  jwt_decoder: ^2.0.1
+
+  # Secure Storage
+  flutter_secure_storage: ^9.0.0
+
+  # Image Loading
+  image_picker: ^1.0.5
+  image: ^4.1.7
+
+  # Permissions
+  permission_handler: ^11.1.0
+
+  # Logging
+  logger: ^2.0.2+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  
+  # Code Generation
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  freezed: ^2.4.6
+  injectable_generator: ^2.4.1
+  riverpod_generator: ^2.3.9
+  drift_dev: ^2.14.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/sekretess_logo.jpg
+    - assets/icons/

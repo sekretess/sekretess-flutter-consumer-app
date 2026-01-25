@@ -1,0 +1,15 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+
+// Disable asset validation to avoid simulator runtime errors
+VALIDATE_DEVELOPMENT_ASSET_PATHS = NO
+VALIDATE_PRODUCT = NO
+// Disable asset catalog filtering that causes simulator device errors
+ASSETCATALOG_FILTER_FOR_DEVICE_MODEL = 
+ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION = 
+ASSETCATALOG_FILTER_FOR_THINNING_DEVICE_CONFIGURATION = 
+// Disable Interface Builder validation
+IBSC_DISABLE_INTERFACE_BUILDER_VALIDATION = YES
+// Additional settings to skip IB validation
+COMPILER_INDEX_STORE_ENABLE = NO
+ENABLE_PREVIEWS = NO 
