@@ -8,6 +8,7 @@ abstract class ICryptographicService {
   Future<String?> decryptPrivateMessage(String sender, String base64Message);
   Future<void> processKeyDistributionMessage(String name, String base64Key);
   Future<void> updateOneTimeKeys();
+  Future<void> clearSignalKeys();
   Future<Map<String, dynamic>?> initializeKeyBundle();
 }
 
@@ -82,6 +83,15 @@ class CryptographicService implements ICryptographicService {
       await _channel.invokeMethod<void>('updateOneTimeKeys');
     } catch (e) {
       _logger.e('Failed to update one-time keys', error: e);
+    }
+  }
+
+  @override
+  Future<void> clearSignalKeys() async {
+    try {
+      await _channel.invokeMethod<void>('clearSignalKeys');
+    } catch (e) {
+      _logger.e('Failed to clear Signal keys', error: e);
     }
   }
 

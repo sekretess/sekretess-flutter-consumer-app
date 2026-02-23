@@ -116,11 +116,13 @@ public class SekretessCryptographicService {
     public void storeKyberPreKeyRecords(KyberPreKeyRecord[] kyberPreKeyRecords) {
         for (KyberPreKeyRecord kyberPreKeyRecord : kyberPreKeyRecords) {
             sekretessSignalProtocolStore.storeKyberPreKey(kyberPreKeyRecord.getId(), kyberPreKeyRecord);
+            Log.i(TAG, "Storing KyberPreKEyRecord:" +kyberPreKeyRecord.getId());
         }
     }
 
     public void storePreKeyRecords(PreKeyRecord[] preKeyRecords) {
         for (PreKeyRecord preKeyRecord : preKeyRecords) {
+            Log.i(TAG, "Storing PreKeyRecord:" +preKeyRecord.getId());
             sekretessSignalProtocolStore.storePreKey(preKeyRecord.getId(), preKeyRecord);
         }
     }
@@ -145,6 +147,14 @@ public class SekretessCryptographicService {
             preKeyRecords[i] = preKeyRecord;
         }
         return preKeyRecords;
+    }
+
+    /**
+     * Clears all Signal protocol keys from local storage (e.g. on logout).
+     * Call this in parallel with removing auth state when the user logs out.
+     */
+    public void clearSignalKeys() {
+        sekretessSignalProtocolStore.clearStorage();
     }
 
     public KeyBundle initializeKeyBundle() {

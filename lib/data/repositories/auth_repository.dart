@@ -5,6 +5,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/auth_response.dart';
+import '../services/cryptographic_service.dart';
 import '../../core/network/api_client.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -23,10 +24,11 @@ abstract class IAuthRepository {
 class AuthRepository implements IAuthRepository {
   final ApiClient _apiClient;
   final SharedPreferences _prefs;
+  final ICryptographicService _cryptographicService;
   static const String _authStateKey = 'auth_state';
   final _logoutController = StreamController<bool>.broadcast();
 
-  AuthRepository(this._apiClient, this._prefs);
+  AuthRepository(this._apiClient, this._prefs, this._cryptographicService);
 
   @override
   Stream<bool> get logoutStream => _logoutController.stream;
@@ -86,12 +88,14 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<void> logout() async {
+    await _cryptographicService.clearSignalKeys();
     await _removeAuthState();
     _logoutController.add(true);
   }
 
   @override
   Future<void> clearUserData() async {
+    await _cryptographicService.clearSignalKeys();
     await _removeAuthState();
     _logoutController.add(true);
   }

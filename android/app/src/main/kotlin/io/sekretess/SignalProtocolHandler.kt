@@ -104,6 +104,16 @@ class SignalProtocolHandler(private val context: Context) {
             Log.e(TAG, "Failed to update one-time keys", e)
         }
     }
+
+    fun clearSignalKeys() {
+        try {
+            Log.d(TAG, "Clearing Signal keys")
+            val cryptoService = getCryptographicService()
+            cryptoService?.clearSignalKeys()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear Signal keys", e)
+        }
+    }
     
     fun initializeKeyBundle(): Map<String, Any>? {
         try {

@@ -136,6 +136,10 @@ import Foundation
                 ))
             }
             
+        case "clearSignalKeys":
+            service.clearSignalKeys()
+            result(nil)
+            
         case "initializeKeyBundle":
             do {
                 let keyBundle = try service.initializeKeyBundle()

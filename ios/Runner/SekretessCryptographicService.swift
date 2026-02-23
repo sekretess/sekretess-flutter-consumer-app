@@ -163,6 +163,12 @@ class SekretessCryptographicService {
         }
     }
     
+    /// Clears all Signal protocol keys from local storage (e.g. on logout).
+    /// Call this in parallel with removing auth state when the user logs out.
+    func clearSignalKeys() {
+        signalProtocolStore.clearStorage()
+    }
+    
     /// Initialize key bundle for signup
     func initializeKeyBundle() throws -> KeyBundle {
         signalProtocolStore.clearStorage()

@@ -177,8 +177,7 @@ class ApiClient {
 
       // Explicitly serialize to JSON string
       final jsonString = jsonEncode(userDto.toJson());
-      final response = await _dio.post(
-        '/consumers',
+      final response = await _dio.post('',
         data: jsonString,
         options: Options(
           contentType: 'application/json',

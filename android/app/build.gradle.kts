@@ -7,6 +7,16 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "io.sekretess"
     compileSdk = flutter.compileSdkVersion
@@ -27,18 +37,55 @@ android {
         applicationId = "io.sekretess"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        minSdk = 30
+        targetSdk = 35
+        versionCode = 40
+        versionName = "Copra"
+    }
+
+
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storeFile = file(keystoreProperties.getProperty("storeFile"))
+            storePassword = keystoreProperties.getProperty("storePassword")
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+
+            buildConfigField(
+                "String",
+                "AUTH_API_URL",
+                "\"https://auth.test.sekretess.io/realms/consumer/.well-known/openid-configuration\""
+            )
+            buildConfigField(
+                "String",
+                "CONSUMER_API_URL",
+                "\"https://consumer.test.sekretess.io/api/v1/consumers\""
+            )
+            buildConfigField(
+                "String",
+                "BUSINESS_API_URL",
+                "\"https://business.test.sekretess.net/api/v1/businesses\""
+            )
+
+            buildConfigField(
+                "String",
+                "WEB_SOCKET_URL",
+                "\"wss://consumer.test.sekretess.io/api/v1/consumers/ws\""
+            )
         }
+    }
+    buildFeatures{
+        buildConfig = true
+        viewBinding = true
     }
 }
 

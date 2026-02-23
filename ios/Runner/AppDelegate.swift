@@ -68,18 +68,18 @@ import UIKit
       print("AppDelegate: Waiting for \(method) response...")
       let startTime = Date()
       
-      let waitResult = group.wait(timeout: .now() + 60) // Increased timeout to 60 seconds
-      let elapsed = Date().timeIntervalSince(startTime)
-      
-      if waitResult == .timedOut {
-        print("AppDelegate: Timeout waiting for \(method) response (elapsed: \(elapsed)s)")
-        return false
-      } else {
-        resultLock.lock()
-        defer { resultLock.unlock() }
-        print("AppDelegate: \(method) completed: \(resultValue) (elapsed: \(elapsed)s)")
-        return resultValue
-      }
+      //let waitResult = group.wait(timeout: .now() + 60) // Increased timeout to 60 seconds
+      //let elapsed = Date().timeIntervalSince(startTime)
+      return true
+//      if waitResult == .timedOut {
+//        print("AppDelegate: Timeout waiting for \(method) response (elapsed: \(elapsed)s)")
+//        return false
+//      } else {
+//        resultLock.lock()
+//        defer { resultLock.unlock() }
+//        print("AppDelegate: \(method) completed: \(resultValue) (elapsed: \(elapsed)s)")
+//        return resultValue
+//      }
     }
   }
 }

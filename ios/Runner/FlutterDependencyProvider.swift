@@ -59,7 +59,19 @@ class FlutterDependencyProvider {
             print("API callback not set")
             return false
         }
-        return callback(method, arguments)
+        
+        // If we're already on the main thread, just execute the callback.
+        if Thread.isMainThread {
+            return callback(method, arguments)
+        } else {
+            // If we're on a background thread, synchronously dispatch to the main
+            // thread to prevent deadlocking the UI thread, which handles MethodChannel calls.
+            var result = false
+            DispatchQueue.main.sync {
+                result = callback(method, arguments)
+            }
+            return result
+        }
     }
     
     static func getApplicationContext() -> Any {

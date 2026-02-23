@@ -1,0 +1,2 @@
+-keep class org.signal.libsignal.** { *; }
+-keep interface org.signal.libsignal.** { *; }

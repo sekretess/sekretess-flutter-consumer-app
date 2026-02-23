@@ -1,12 +1,15 @@
 package io.sekretess
 
+import android.Manifest
 import android.os.Handler
 import android.os.Looper
+import androidx.core.app.ActivityCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.CountDownLatch
+import io.sekretess.BuildConfig
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -15,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference
 class MainActivity : FlutterActivity() {
     private val SIGNAL_PROTOCOL_CHANNEL = "io.sekretess/signal_protocol"
     private val API_BRIDGE_CHANNEL = "io.sekretess/api_bridge"
+    private val VERSION_CHANNEL = "io.sekretess/version"
     private lateinit var signalProtocolHandler: SignalProtocolHandler
     private lateinit var apiBridgeChannel: MethodChannel
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -22,6 +26,22 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf<String>(Manifest.permission.POST_NOTIFICATIONS),
+            1
+        )
+        // Version Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VERSION_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "getAppVersion") {
+                val versionName = BuildConfig.VERSION_NAME
+                val versionCode = BuildConfig.VERSION_CODE
+                val versionInfo = mapOf("versionName" to versionName, "versionCode" to versionCode)
+                result.success(versionInfo)
+            } else {
+                result.notImplemented()
+            }
+        }
         
         // Initialize FlutterDependencyProvider first
         io.sekretess.bridge.FlutterDependencyProvider.initialize(applicationContext)
@@ -117,7 +137,7 @@ class MainActivity : FlutterActivity() {
                         // Already on main thread - call directly
                         apiBridgeChannel.invokeMethod("updateOneTimeKeys", keysMap, object : MethodChannel.Result {
                             override fun success(resultValue: Any?) {
-                                android.util.Log.i("MainActivity", "updateOneTimeKeys success: $resultValue")
+                                android.util.Log.i("MainActivity", "updateOneTimeKeys success****: $resultValue")
                                 result.set(resultValue as? Boolean ?: false)
                                 latch.countDown()
                             }
@@ -164,20 +184,21 @@ class MainActivity : FlutterActivity() {
                     }
                     
                     // Wait for result on current thread
-                    val awaited = latch.await(30, TimeUnit.SECONDS)
-                    if (awaited) {
-                        val error = errorRef.get()
-                        if (error != null && error == "NOT_IMPLEMENTED") {
-                            android.util.Log.w("MainActivity", "Handler not ready, returning false")
-                            false
-                        } else {
-                            android.util.Log.i("MainActivity", "updateOneTimeKeys completed: ${result.get()}")
-                            result.get()
-                        }
-                    } else {
-                        android.util.Log.e("MainActivity", "Timeout waiting for updateOneTimeKeys response")
-                        false
-                    }
+//                    val awaited = latch.await(30, TimeUnit.SECONDS)
+//                    if (awaited) {
+//                        val error = errorRef.get()
+//                        if (error != null && error == "NOT_IMPLEMENTED") {
+//                            android.util.Log.w("MainActivity", "Handler not ready, returning false")
+//                            false
+//                        } else {
+//                            android.util.Log.i("MainActivity", "updateOneTimeKeys completed: ${result.get()}")
+//                            result.get()
+//                        }
+//                    } else {
+//                        android.util.Log.e("MainActivity", "Timeout waiting for updateOneTimeKeys response")
+//                        false
+//                    }
+                    true
                 } catch (e: Exception) {
                     android.util.Log.e("MainActivity", "Error in onUpdateOneTimeKeys", e)
                     false
@@ -256,6 +277,14 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     } catch (e: Exception) {
                         result.error("UPDATE_KEYS_ERROR", e.message, null)
+                    }
+                }
+                "clearSignalKeys" -> {
+                    try {
+                        signalProtocolHandler.clearSignalKeys()
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("CLEAR_KEYS_ERROR", e.message, null)
                     }
                 }
                 "initializeKeyBundle" -> {

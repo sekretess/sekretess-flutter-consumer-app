@@ -6,6 +6,7 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/services/cryptographic_service.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/services/version_service.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -18,11 +19,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   String? _username;
   bool _isLoading = true;
   bool _isUpdatingKeys = false;
+  String? _versionName;
+  int? _versionCode;
 
   @override
   void initState() {
     super.initState();
     _loadUsername();
+    _loadVersionInfo();
   }
 
   Future<void> _loadUsername() async {
@@ -42,6 +46,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadVersionInfo() async {
+    final versionService = VersionService();
+    final versionInfo = await versionService.getAppVersion();
+    if (mounted) {
+      setState(() {
+        _versionName = versionInfo['versionName'];
+        _versionCode = versionInfo['versionCode'];
+      });
     }
   }
 
@@ -187,9 +202,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('About'),
-        content: const Text(
-          'Sekretess Consumer App\n\n'
-          'Version 1.0.0\n\n'
+        content: Text(
+          'Sekretess Consumer App\n\n' 
+          'Version: $_versionName (Build: $_versionCode)\n\n'
           'Secure messaging application with end-to-end encryption.',
         ),
         actions: [
