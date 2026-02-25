@@ -8,6 +8,7 @@ import '../../core/enums/sekretess_event.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/cryptographic_service.dart';
 import '../../data/services/message_service.dart';
+import '../providers/message_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'home_page.dart';
 import 'businesses_page.dart';
@@ -29,12 +30,7 @@ class _MainPageState extends ConsumerState<MainPage> {
   StreamSubscription<SekretessEvent>? _eventSubscription;
   StreamSubscription<bool>? _logoutSubscription;
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _snackBarController;
-
-  final List<Widget> _pages = [
-    const HomePage(),
-    const BusinessesPage(),
-    const ProfilePage(),
-  ];
+  String? _username;
 
   @override
   void initState() {
@@ -42,6 +38,9 @@ class _MainPageState extends ConsumerState<MainPage> {
     _webSocketService = getIt<WebSocketService>();
     _authRepository = getIt<AuthRepository>();
     _cryptographicService = getIt<CryptographicService>();
+
+    _loadUsername();
+
     // Delay Signal Protocol initialization to ensure ApiBridgeService handler is registered
     Future.delayed(const Duration(milliseconds: 500), () {
       _initializeSignalProtocol();
@@ -49,26 +48,29 @@ class _MainPageState extends ConsumerState<MainPage> {
     _connectWebSocket();
     _listenToWebSocketEvents();
     _listenToLogoutEvents();
-    // TEMPORARY: Insert test messages at startup - REMOVE IN PRODUCTION
-    // _insertTestData();
+  }
+
+  Future<void> _loadUsername() async {
+    final username = await _authRepository.getUsername();
+    if (mounted) {
+      setState(() {
+        _username = username;
+      });
+    }
   }
 
   Future<void> _initializeSignalProtocol() async {
     try {
       final success = await _cryptographicService.init();
-      if (!success) {
-        // Handle initialization failure
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to initialize encryption. Please restart the app.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize encryption. Please restart the app.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      // Handle error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -110,6 +112,11 @@ class _MainPageState extends ConsumerState<MainPage> {
   void _listenToLogoutEvents() {
     _logoutSubscription = _authRepository.logoutStream.listen((_) {
       if (mounted) {
+        // CRITICAL: Invalidate providers to clear cached data for the new user session.
+        ref.invalidate(messageBriefsProvider);
+        ref.invalidate(topSendersProvider);
+        ref.invalidate(messageEventStreamProvider);
+
         _webSocketService.disconnect();
         _navigateToLogin();
       }
@@ -143,15 +150,13 @@ class _MainPageState extends ConsumerState<MainPage> {
           label: 'Reconnect',
           textColor: Colors.white,
           onPressed: () {
-            // Close the current snackbar so it can reappear if connection fails
             _hideConnectionSnackbar();
             _webSocketService.connect();
           },
         ),
       ),
     );
-    
-    // Reset controller when snackbar is dismissed (e.g., by user swipe)
+
     _snackBarController?.closed.then((_) {
       _snackBarController = null;
     });
@@ -160,19 +165,6 @@ class _MainPageState extends ConsumerState<MainPage> {
   void _hideConnectionSnackbar() {
     _snackBarController?.close();
     _snackBarController = null;
-  }
-
-  // TEMPORARY: Insert test messages at startup - REMOVE IN PRODUCTION
-  Future<void> _insertTestData() async {
-    try {
-      // Wait a bit to ensure user is authenticated
-      await Future.delayed(const Duration(seconds: 1));
-      final messageService = getIt<MessageService>();
-      await messageService.insertTestData();
-    } catch (e) {
-      // Silently fail - this is just for testing
-      print('Failed to insert test data: $e');
-    }
   }
 
   @override
@@ -198,6 +190,14 @@ class _MainPageState extends ConsumerState<MainPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Create the pages list directly in the build method.
+    // This ensures the HomePage gets a new ValueKey whenever the username changes.
+    final pages = [
+      HomePage(key: ValueKey<String?>(_username)),
+      const BusinessesPage(),
+      const ProfilePage(),
+    ];
+
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       appBar: AppBar(
@@ -206,7 +206,9 @@ class _MainPageState extends ConsumerState<MainPage> {
         backgroundColor: AppColors.primaryBackground,
         foregroundColor: AppColors.white,
       ),
-      body: _pages[_currentIndex],
+      body: _username == null
+          ? const Center(child: CircularProgressIndicator())
+          : pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {

@@ -13,12 +13,10 @@ import 'cryptographic_service.dart';
 import '../database/message_database.dart' as db;
 
 abstract class IMessageService {
-  Future<List<MessageBriefDto>> getMessageBriefs();
-  Future<List<String>> getTopSenders();
+  Future<List<MessageBriefDto>> getMessageBriefs(String username);
+  Future<List<String>> getTopSenders(String username);
   Future<void> handleMessage(MessageDto message);
   Future<List<MessageRecordDto>> loadMessages(String sender);
-  // TEMPORARY: Test method to insert test messages - REMOVE IN PRODUCTION
-  Future<void> insertTestData();
 }
 
 @lazySingleton
@@ -35,13 +33,13 @@ class MessageService implements IMessageService {
   );
 
   @override
-  Future<List<MessageBriefDto>> getMessageBriefs() async {
-    return await _messageRepository.getMessageBriefs();
+  Future<List<MessageBriefDto>> getMessageBriefs(String username) async {
+    return await _messageRepository.getMessageBriefs(username);
   }
 
   @override
-  Future<List<String>> getTopSenders() async {
-    return await _messageRepository.getTopSenders();
+  Future<List<String>> getTopSenders(String username) async {
+    return await _messageRepository.getTopSenders(username);
   }
 
   @override
@@ -191,61 +189,6 @@ class MessageService implements IMessageService {
       } else {
         return DateFormat('dd MMMM').format(dateTime); // Day and month
       }
-    }
-  }
-
-  // TEMPORARY: Test method to insert test messages - REMOVE IN PRODUCTION
-  @override
-  Future<void> insertTestData() async {
-    try {
-      final username = await _authRepository.getUsername();
-      if (username == null) {
-        _logger.w('Cannot insert test data: No username');
-        return;
-      }
-
-      _logger.i('Inserting test messages for user: $username');
-
-      // Clear existing messages first
-      await _messageRepository.clearDatabase();
-
-      // Insert test messages with different timestamps to test date headers
-      final now = DateTime.now();
-      
-      // Messages from test_business (today)
-      await _messageRepository.storeDecryptedMessage('test_business', 'Hello! This is a test message.', username);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _messageRepository.storeDecryptedMessage('test_business', 'This is another test message from today.', username);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _messageRepository.storeDecryptedMessage('test_business', 'Testing the message display functionality.', username);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _messageRepository.storeDecryptedMessage('test_business', 'Last message for today from test_business.', username);
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Messages from test_business1 (yesterday - simulate by inserting with older timestamp)
-      final yesterday = now.subtract(const Duration(days: 1));
-      await _insertMessageWithTimestamp('test_business1', 'This is a message from yesterday.', username, yesterday);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _insertMessageWithTimestamp('test_business1', 'Another message from yesterday.', username, yesterday);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _insertMessageWithTimestamp('test_business1', 'Third message from yesterday.', username, yesterday);
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Messages from test_business2 (last week)
-      final lastWeek = now.subtract(const Duration(days: 5));
-      await _insertMessageWithTimestamp('test_business2', 'This is a message from last week.', username, lastWeek);
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      await _insertMessageWithTimestamp('test_business2', 'Another message from last week.', username, lastWeek);
-
-      _logger.i('Test messages inserted successfully');
-    } catch (e) {
-      _logger.e('Failed to insert test data', error: e);
     }
   }
 

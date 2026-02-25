@@ -1,3 +1,4 @@
+
 import 'package:injectable/injectable.dart';
 import 'package:logger/logger.dart';
 
@@ -10,13 +11,11 @@ import 'auth_repository.dart';
 import '../database/message_database.dart' as db;
 
 abstract class IMessageRepository {
-  Future<List<MessageBriefDto>> getMessageBriefs();
-  Future<List<String>> getTopSenders();
+  Future<List<MessageBriefDto>> getMessageBriefs(String username);
+  Future<List<String>> getTopSenders(String username);
   Future<void> storeDecryptedMessage(String sender, String message, String username);
   Future<List<Message>> getMessages(String username, String sender);
   Future<void> deleteMessage(int messageId);
-  // TEMPORARY: Clear database for testing - REMOVE IN PRODUCTION
-  Future<void> clearDatabase();
 }
 
 @lazySingleton
@@ -27,12 +26,8 @@ class MessageRepository implements IMessageRepository {
   MessageRepository() : _database = MessageDatabase();
 
   @override
-  Future<List<MessageBriefDto>> getMessageBriefs() async {
+  Future<List<MessageBriefDto>> getMessageBriefs(String username) async {
     try {
-      final authRepository = getIt<AuthRepository>();
-      final username = await authRepository.getUsername();
-      if (username == null) return [];
-
       final messages = await _database.getMessageBriefs(username);
       return messages.map((msg) {
         return MessageBriefDto(
@@ -48,9 +43,9 @@ class MessageRepository implements IMessageRepository {
   }
 
   @override
-  Future<List<String>> getTopSenders() async {
+  Future<List<String>> getTopSenders(String username) async {
     try {
-      return await _database.getTopSenders();
+      return await _database.getTopSenders(username);
     } catch (e) {
       _logger.e('Failed to get top senders', error: e);
       return [];
@@ -87,17 +82,6 @@ class MessageRepository implements IMessageRepository {
       await _database.deleteMessage(messageId);
     } catch (e) {
       _logger.e('Failed to delete message', error: e);
-    }
-  }
-
-  // TEMPORARY: Clear database for testing - REMOVE IN PRODUCTION
-  @override
-  Future<void> clearDatabase() async {
-    try {
-      await _database.clear();
-      _logger.i('Database cleared');
-    } catch (e) {
-      _logger.e('Failed to clear database', error: e);
     }
   }
 }

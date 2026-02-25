@@ -59,13 +59,17 @@ class MessageDatabase extends _$MessageDatabase {
   }
 
   // Get top 4 senders (distinct senders, ordered by most recent)
-  Future<List<String>> getTopSenders() async {
+  Future<List<String>> getTopSenders(String username) async {
     final query = customSelect(
       '''
       SELECT DISTINCT sender FROM messages 
+      WHERE username = ?
       ORDER BY created_at DESC 
       LIMIT 4
       ''',
+       variables: [
+        Variable.withString(username),
+      ],
       readsFrom: {messages},
     );
     

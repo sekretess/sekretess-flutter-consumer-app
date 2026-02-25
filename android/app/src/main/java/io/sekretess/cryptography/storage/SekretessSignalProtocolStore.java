@@ -204,9 +204,8 @@ public class SekretessSignalProtocolStore implements SignalProtocolStore {
     public boolean clearStorage() {
         this.identityKeyStore.clearStorage();
         this.preKeyStore.clearStorage();
-        this.sessionStore.clearStorage();
+        // this.sessionStore.clearStorage();
         this.signedPreKeyStore.clearStorage();
-        this.senderKeyStore.clearStorage();
         this.kyberPreKeyStore.clearStorage();
         return true;
     }

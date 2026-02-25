@@ -39,8 +39,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 30
         targetSdk = 35
-        versionCode = 40
-        versionName = "Copra"
+        versionCode = 41
+        versionName = "Husk"
     }
 
 
@@ -96,7 +96,7 @@ flutter {
 dependencies {
     // Core library desugaring (required for libsignal-android)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    
+    implementation("com.google.android.play:app-update:2.1.0")
     // Signal Protocol dependencies
     implementation("org.signal:libsignal-client:0.80.1")
     runtimeOnly("org.signal:libsignal-android:0.78.2")
