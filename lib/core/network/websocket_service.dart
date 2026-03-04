@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/widgets.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:injectable/injectable.dart';
@@ -23,7 +24,7 @@ abstract class IWebSocketService {
 }
 
 @lazySingleton
-class WebSocketService implements IWebSocketService {
+class WebSocketService extends WidgetsBindingObserver implements IWebSocketService {
   final AuthRepository _authRepository;
   final MessageService _messageService;
   final Logger _logger = Logger();
@@ -36,8 +37,16 @@ class WebSocketService implements IWebSocketService {
   Timer? _pingTimer;
   DateTime? _tokenSentTime;
   bool _isAuthenticating = false;
+  
+  // Reconnection logic
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  bool _isManualDisconnect = false;
+  static const int _maxReconnectDelaySeconds = 60;
 
-  WebSocketService(this._authRepository, this._messageService);
+  WebSocketService(this._authRepository, this._messageService) {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   Stream<SekretessEvent> get eventStream => _eventController.stream;
@@ -58,15 +67,22 @@ class WebSocketService implements IWebSocketService {
       return;
     }
 
-    try {
-      final token = await _authRepository.getAccessToken();
-      if (token == null) {
-        _logger.e('Cannot connect: No access token');
-        _eventController.add(SekretessEvent.authFailed);
-        _handleUnauthorized();
-        return;
-      }
+    // Don't try to connect if user is not authorized
+    // We check this without forcing a refresh if possible, or handling the null
+    final token = await _authRepository.getAccessToken();
+    if (token == null) {
+      _logger.w('WebSocket connect: No access token available (User might be logged out or refresh failed)');
+      // If we don't have a token, we just wait and retry later. 
+      // We do NOT call _handleUnauthorized() here because that forces a logout.
+      // The AuthRepository will force a logout itself if the refresh token is actually expired.
+      _scheduleReconnect();
+      return;
+    }
 
+    _isManualDisconnect = false;
+    _reconnectTimer?.cancel();
+
+    try {
       final uri = Uri.parse('${AppConstants.webSocketUrl}/ws');
       final webSocket = await WebSocket.connect(
         uri.toString(),
@@ -90,18 +106,15 @@ class WebSocketService implements IWebSocketService {
       _channel!.sink.add(token);
       
       // Wait a bit to see if connection closes immediately (indicates 403)
-      // If connection is still open after a short delay, consider it authenticated
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // Check if connection was closed during authentication (indicates 403)
       if (!_isAuthenticating) {
-        // Connection was closed, _handleDone or _handleError already handled it
         return;
       }
       
-      // Connection is still open, authentication successful
       _isConnected = true;
       _isAuthenticating = false;
+      _reconnectAttempts = 0; // Reset attempts on successful connection
       _eventController.add(SekretessEvent.websocketConnectionEstablished);
       _startPingTimer();
       _logger.i('WebSocket connected and authenticated');
@@ -110,7 +123,6 @@ class WebSocketService implements IWebSocketService {
       _isConnected = false;
       _isAuthenticating = false;
       
-      // Check if error indicates 403
       final errorString = e.toString().toLowerCase();
       if (errorString.contains('403') || 
           errorString.contains('forbidden') ||
@@ -119,6 +131,35 @@ class WebSocketService implements IWebSocketService {
         _handleUnauthorized();
       } else {
         _eventController.add(SekretessEvent.websocketConnectionLost);
+        _scheduleReconnect();
+      }
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_isManualDisconnect || (_reconnectTimer?.isActive ?? false)) return;
+
+    _reconnectAttempts++;
+    final delaySeconds = (_reconnectAttempts * 2).clamp(2, _maxReconnectDelaySeconds);
+    
+    _logger.i('Scheduling WebSocket reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)');
+    
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      if (!_isConnected && !_isManualDisconnect) {
+        connect();
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _logger.i('App lifecycle state changed: $state');
+    if (state == AppLifecycleState.resumed) {
+      if (!_isConnected && !_isManualDisconnect) {
+        _logger.i('App resumed, attempting to reconnect WebSocket');
+        // When resuming, we try to connect immediately
+        _reconnectTimer?.cancel();
+        connect();
       }
     }
   }
@@ -126,12 +167,9 @@ class WebSocketService implements IWebSocketService {
   void _handleMessage(dynamic message) {
     try {
       String messageString;
-      
-      // Handle both String and List<int> (binary) messages
       if (message is String) {
         messageString = message;
       } else if (message is List<int>) {
-        // Convert array of integers (bytes) to UTF-8 string
         messageString = utf8.decode(message);
         _logger.d('Received binary message, converted to string: $messageString');
       } else {
@@ -141,18 +179,11 @@ class WebSocketService implements IWebSocketService {
       
       final json = jsonDecode(messageString) as Map<String, dynamic>;
       final messageDto = MessageDto.fromJson(json);
-      
-      // Handle message through MessageService (which will decrypt it)
       _messageService.handleMessage(messageDto);
-      
-      // Send ACK
-      sendAck(messageDto.messageId, 2); // MESSAGE_HANDLING_SUCCESS
-      
-      // Also emit to message stream for UI updates
+      sendAck(messageDto.messageId, 2); 
       _messageController.add(messageDto);
     } catch (e) {
       _logger.e('Error handling WebSocket message', error: e);
-      // Try to send failure ACK if we have message ID
       try {
         String messageString;
         if (message is String) {
@@ -162,13 +193,10 @@ class WebSocketService implements IWebSocketService {
         } else {
           return;
         }
-        
         final json = jsonDecode(messageString) as Map<String, dynamic>;
         final messageDto = MessageDto.fromJson(json);
-        sendAck(messageDto.messageId, 3); // MESSAGE_HANDLING_FAILED
-      } catch (_) {
-        // Ignore ACK errors
-      }
+        sendAck(messageDto.messageId, 3);
+      } catch (_) {}
     }
   }
 
@@ -177,7 +205,6 @@ class WebSocketService implements IWebSocketService {
     _isConnected = false;
     _stopPingTimer();
     
-    // Check if error indicates 403/Forbidden
     final errorString = error.toString().toLowerCase();
     if (errorString.contains('403') || 
         errorString.contains('forbidden') ||
@@ -188,7 +215,6 @@ class WebSocketService implements IWebSocketService {
     }
     
     if (_isAuthenticating && _tokenSentTime != null) {
-      // If connection fails shortly after sending token, likely auth failure
       final timeSinceToken = DateTime.now().difference(_tokenSentTime!);
       if (timeSinceToken.inSeconds < 2) {
         _logger.e('WebSocket closed immediately after authentication, likely 403');
@@ -197,9 +223,9 @@ class WebSocketService implements IWebSocketService {
       }
     }
     
-    // Only emit connection lost if we were actually connected (not during auth)
     if (!_isAuthenticating) {
       _eventController.add(SekretessEvent.websocketConnectionLost);
+      _scheduleReconnect();
     }
   }
 
@@ -208,7 +234,6 @@ class WebSocketService implements IWebSocketService {
     _isConnected = false;
     _stopPingTimer();
     
-    // If connection closed shortly after sending token, likely 403
     if (_isAuthenticating && _tokenSentTime != null) {
       final timeSinceToken = DateTime.now().difference(_tokenSentTime!);
       if (timeSinceToken.inSeconds < 2) {
@@ -218,24 +243,26 @@ class WebSocketService implements IWebSocketService {
       }
     }
     
-    // Only emit connection lost if we were actually connected
     if (!_isAuthenticating) {
       _eventController.add(SekretessEvent.websocketConnectionLost);
+      _scheduleReconnect();
     }
     _isAuthenticating = false;
   }
   
   void _handleUnauthorized() {
+    // Only force logout if we are absolutely sure the session is invalid
     _logger.e('WebSocket unauthorized (403), logging out user');
     _isAuthenticating = false;
     _isConnected = false;
     _eventController.add(SekretessEvent.authFailed);
-    // Clear auth state and trigger logout
     _authRepository.clearUserData();
   }
 
   @override
   void disconnect() {
+    _isManualDisconnect = true;
+    _reconnectTimer?.cancel();
     _stopPingTimer();
     _channel?.sink.close();
     _isConnected = false;
@@ -245,14 +272,12 @@ class WebSocketService implements IWebSocketService {
   @override
   bool ping() {
     if (!_isConnected) {
-      _logger.e('WebSocket is not connected');
       return false;
     }
 
     try {
       final pingMessage = 'sekretess-ping:${DateTime.now().millisecondsSinceEpoch}';
       _channel?.sink.add(pingMessage);
-      _logger.i('Ping sent');
       return true;
     } catch (e) {
       _logger.e('Ping failed', error: e);
@@ -284,6 +309,7 @@ class WebSocketService implements IWebSocketService {
   }
 
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     disconnect();
     _eventController.close();
     _messageController.close();

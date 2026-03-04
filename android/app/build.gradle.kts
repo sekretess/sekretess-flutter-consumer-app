@@ -39,8 +39,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 30
         targetSdk = 35
-        versionCode = 41
-        versionName = "Husk"
+        versionCode = 47
+        versionName = "Grape"
     }
 
 

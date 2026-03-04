@@ -50,6 +50,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        checkForAppUpdate()
         ActivityCompat.requestPermissions(
             this,
             arrayOf<String>(Manifest.permission.POST_NOTIFICATIONS),

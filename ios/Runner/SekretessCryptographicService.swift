@@ -8,23 +8,23 @@ class SekretessCryptographicService {
     private let signalProtocolStore: SekretessSignalProtocolStore
     private let deviceId: UInt32 = 1
     private let storeContext = SimpleStoreContext()
-    
+
     init(signalProtocolStore: SekretessSignalProtocolStore) {
         self.signalProtocolStore = signalProtocolStore
     }
-    
+
     /// Initialize Signal Protocol - generates keys if needed and uploads to server
     func initialize() throws -> Bool {
         if signalProtocolStore.registrationRequired() {
             let keyBundle = try initializeKeyBundle()
-            
+
             // Call API bridge to upload keys
             let keyBundleMap = KeyBundleConverter.toMap(keyBundle: keyBundle)
             let success = FlutterDependencyProvider.callApi(
                 method: "upsertKeyStore",
                 arguments: keyBundleMap
             )
-            
+
             if success {
                 storeKyberPreKeyRecords(keyBundle.kyberPreKeyRecords)
                 storePreKeyRecords(keyBundle.opk)
@@ -41,15 +41,15 @@ class SekretessCryptographicService {
         }
         return true
     }
-    
+
     /// Decrypt a group chat message
     func decryptGroupChatMessage(sender: String, base64Message: String) throws -> String? {
         guard let messageData = Data(base64Encoded: base64Message) else {
             throw SignalProtocolError.invalidMessage
         }
-        
+
         let address = try ProtocolAddress(name: sender, deviceId: deviceId)
-        
+
         do {
             let decryptedData = try groupDecrypt(
                 messageData,
@@ -66,15 +66,15 @@ class SekretessCryptographicService {
             throw SignalProtocolError.invalidMessage
         }
     }
-    
+
     /// Decrypt a private message
     func decryptPrivateMessage(sender: String, base64Message: String) throws -> String? {
         guard let messageData = Data(base64Encoded: base64Message) else {
             throw SignalProtocolError.invalidMessage
         }
-        
+
         let address = try ProtocolAddress(name: sender, deviceId: deviceId)
-        
+
         // Try as PreKeySignalMessage first
         do {
             let preKeyMessage = try PreKeySignalMessage(bytes: messageData)
@@ -114,16 +114,16 @@ class SekretessCryptographicService {
             }
         }
     }
-    
+
     /// Process a key distribution message for group chats
     func processKeyDistributionMessage(name: String, base64Key: String) throws {
         guard let keyData = Data(base64Encoded: base64Key) else {
             throw SignalProtocolError.invalidMessage
         }
-        
+
         let address = try ProtocolAddress(name: name, deviceId: deviceId)
         let distributionMessage = try SenderKeyDistributionMessage(bytes: keyData)
-        
+
         do {
             try processSenderKeyDistributionMessage(
                 distributionMessage,
@@ -137,24 +137,24 @@ class SekretessCryptographicService {
             throw error
         }
     }
-    
+
     /// Update one-time keys
     func updateOneTimeKeys() throws {
         let identityKeyPair = try signalProtocolStore.identityKeyStore.identityKeyPair(context: storeContext)
         let preKeyRecords = generatePreKeys()
         let kyberPreKeyRecords = generateKyberPreKeys(privateKey: identityKeyPair.privateKey)
-        
+
         // Convert to map for API call
         let keysMap = KeyBundleConverter.oneTimeKeysToMap(
             preKeyRecords: preKeyRecords,
             kyberPreKeyRecords: kyberPreKeyRecords
         )
-        
+
         let success = FlutterDependencyProvider.callApi(
             method: "updateOneTimeKeys",
             arguments: keysMap
         )
-        
+
         if success {
             storePreKeyRecords(preKeyRecords)
             storeKyberPreKeyRecords(kyberPreKeyRecords)
@@ -162,28 +162,28 @@ class SekretessCryptographicService {
             throw SignalProtocolError.apiCallFailed
         }
     }
-    
+
     /// Clears all Signal protocol keys from local storage (e.g. on logout).
     /// Call this in parallel with removing auth state when the user logs out.
     func clearSignalKeys() {
         signalProtocolStore.clearStorage()
     }
-    
+
     /// Initialize key bundle for signup
     func initializeKeyBundle() throws -> KeyBundle {
         signalProtocolStore.clearStorage()
-        
+
         let signedPreKeyPrivateKey = PrivateKey.generate()
         let identityKeyPair = try signalProtocolStore.identityKeyStore.identityKeyPair(context: storeContext)
         let registrationId = try signalProtocolStore.identityKeyStore.localRegistrationId(context: storeContext)
-        
+
         let publicKeyData = signedPreKeyPrivateKey.publicKey.serialize()
         let signature = identityKeyPair.privateKey.generateSignature(message: publicKeyData)
-        
+
         let opk = generatePreKeys()
         let signedPreKeyRecord = try generateSignedPreKey(privateKey: signedPreKeyPrivateKey, signature: signature)
         let kyberPreKeyRecords = generateKyberPreKeys(privateKey: identityKeyPair.privateKey)
-        
+
         return KeyBundle(
             registrationId: registrationId,
             opk: opk,
@@ -193,7 +193,7 @@ class SekretessCryptographicService {
             kyberPreKeyRecords: kyberPreKeyRecords
         )
     }
-    
+
     private func generatePreKeys() -> [PreKeyRecord] {
         var preKeys: [PreKeyRecord] = []
         for _ in 0..<SIGNAL_KEY_COUNT {
@@ -209,7 +209,7 @@ class SekretessCryptographicService {
         }
         return preKeys
     }
-    
+
     private func generateKyberPreKeys(privateKey: PrivateKey) -> [KyberPreKeyRecord] {
         var kyberPreKeys: [KyberPreKeyRecord] = []
         // Generate SIGNAL_KEY_COUNT + 1 (last resort key)
@@ -234,7 +234,7 @@ class SekretessCryptographicService {
         }
         return kyberPreKeys
     }
-    
+
     private func generateSignedPreKey(privateKey: PrivateKey, signature: Data) throws -> SignedPreKeyRecord {
         let id = UInt32.random(in: 1..<9999999)
         let timestamp = UInt64(Date().timeIntervalSince1970)
@@ -245,7 +245,7 @@ class SekretessCryptographicService {
             signature: signature
         )
     }
-    
+
     private func storePreKeyRecords(_ records: [PreKeyRecord]) {
         for record in records {
             do {
@@ -255,7 +255,7 @@ class SekretessCryptographicService {
             }
         }
     }
-    
+
     private func storeKyberPreKeyRecords(_ records: [KyberPreKeyRecord]) {
         for record in records {
             do {
@@ -265,7 +265,7 @@ class SekretessCryptographicService {
             }
         }
     }
-    
+
     private func storeSignedPreKey(_ record: SignedPreKeyRecord) {
         do {
             try signalProtocolStore.signedPreKeyStore.storeSignedPreKey(record, id: record.id, context: storeContext)
