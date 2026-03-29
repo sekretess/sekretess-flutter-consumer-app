@@ -57,3 +57,7 @@ flutter build macos --debug
 flutter build ios --debug
 flutter build apk --debug
 ```
+Or build for publish on google play:
+```bash
+build appbundle --release
+```
