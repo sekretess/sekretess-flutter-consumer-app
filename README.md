@@ -61,3 +61,4 @@ flutter run
 - Development: `flutter run --dart-define=ENV=dev`
 - Staging: `flutter run --dart-define=ENV=staging`
 - Production: `flutter run --dart-define=ENV=prod`
+- Google Play: `flutter build appbundle --release`
